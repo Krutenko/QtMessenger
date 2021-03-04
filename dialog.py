@@ -115,7 +115,6 @@ class MainWindow(QMainWindow):
         # pm = QPixmap(":/img/send1.png")
         # self.send_btn.setIcon(QIcon(pm))
         # self.send_btn.setIconSize(pm.rect().size())
-        # hsdoiurghsiog
         self.send_btn = PicButton(QPixmap(":/img/send1.png"), QPixmap(":/img/send2.png"), QPixmap(":/img/send3.png"))
         self.messages = QListView()
         self.messages.setItemDelegate(MessageDelegate())
