@@ -111,10 +111,7 @@ class MainWindow(QMainWindow):
         id = QFontDatabase.addApplicationFont(":/fonts/lobster.ttf");
         family = QFontDatabase.applicationFontFamilies(id)[0];
         self.send_input.setFont(QFont(family, 14))
-        # self.send_btn = QPushButton()
-        # pm = QPixmap(":/img/send1.png")
-        # self.send_btn.setIcon(QIcon(pm))
-        # self.send_btn.setIconSize(pm.rect().size())
+        self.send_input.returnPressed.connect(self.message_to)
         self.send_btn = PicButton(QPixmap(":/img/send1.png"), QPixmap(":/img/send2.png"), QPixmap(":/img/send3.png"))
         self.messages = QListView()
         self.messages.setItemDelegate(MessageDelegate())
@@ -133,6 +130,7 @@ class MainWindow(QMainWindow):
     def message_to(self):
         self.model.add_message(USER_ME, self.send_input.text())
         self.messages.scrollToBottom()
+        self.send_input.clear()
 
     def message_from(self):
         self.model.add_message(USER_THEM, self.send_input.text())
