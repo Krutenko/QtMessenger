@@ -1,10 +1,10 @@
 import sys
 
 from PyQt5.QtCore import QAbstractListModel, QMargins, QPoint, Qt, QSize
-from PyQt5.QtGui import QColor, QPixmap, QIcon, QPainter, QFont, QFontDatabase
+from PyQt5.QtGui import QColor, QPixmap, QIcon, QPainter, QFont, QFontDatabase, QFontMetrics
 from PyQt5.QtWidgets import (
     QApplication,
-    QLineEdit,
+    QPlainTextEdit,
     QListView,
     QMainWindow,
     QPushButton,
@@ -22,10 +22,12 @@ USER_THEM = 1
 BUBBLE_COLORS = {USER_ME: "#90caf9", USER_THEM: "#a5d6a7"}
 BUBBLE_PADDING = QMargins(15, 5, 15, 5)
 TEXT_PADDING = QMargins(25, 15, 25, 15)
-
+MAX_ROWS = 8
+font = 0
 
 class MessageDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
+        global font
         user, text = index.model().data(index, Qt.DisplayRole)
         bubblerect = option.rect.marginsRemoved(BUBBLE_PADDING)
         textrect = option.rect.marginsRemoved(TEXT_PADDING)
@@ -39,9 +41,7 @@ class MessageDelegate(QStyledItemDelegate):
             p1 = bubblerect.topLeft()
         painter.drawPolygon(p1 + QPoint(-20, 0), p1 + QPoint(20, 0), p1 + QPoint(0, 15))
         painter.setPen(Qt.black)
-        id = QFontDatabase.addApplicationFont(":/fonts/lobster.ttf");
-        family = QFontDatabase.applicationFontFamilies(id)[0];
-        painter.setFont(QFont(family, 14))
+        painter.setFont(font)
         painter.drawText(textrect, Qt.TextWordWrap, text)
 
     def sizeHint(self, option, index):
@@ -77,7 +77,6 @@ class PicButton(QAbstractButton):
         self.pixmap = pixmap
         self.pixmap_hover = pixmap_hover
         self.pixmap_pressed = pixmap_pressed
-
         self.pressed.connect(self.update)
         self.released.connect(self.update)
 
@@ -101,17 +100,22 @@ class PicButton(QAbstractButton):
 
 class MainWindow(QMainWindow):
     def __init__(self):
+        global font
         super(MainWindow, self).__init__()
+        id = QFontDatabase.addApplicationFont(":/fonts/lobster.ttf");
+        family = QFontDatabase.applicationFontFamilies(id)[0];
+        font = QFont(family, 14)
         self.setMinimumSize(int(QApplication.primaryScreen().size().width() * 0.1), int(QApplication.primaryScreen().size().height() * 0.2))
         self.resize(int(QApplication.primaryScreen().size().width() * 0.3), int(QApplication.primaryScreen().size().height() * 0.5))
         main_layout = QVBoxLayout()
         send_layout = QHBoxLayout()
-        self.send_input = QLineEdit()
+        self.send_input = QPlainTextEdit()
         self.send_input.setPlaceholderText("Enter message")
-        id = QFontDatabase.addApplicationFont(":/fonts/lobster.ttf");
-        family = QFontDatabase.applicationFontFamilies(id)[0];
-        self.send_input.setFont(QFont(family, 14))
-        self.send_input.returnPressed.connect(self.message_to)
+        self.send_input.setFont(font)
+        self.send_input.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.message_resize()
+        self.send_input.textChanged.connect(self.message_resize)
+        #self.send_input.returnPressed.connect(self.message_to)
         self.send_btn = PicButton(QPixmap(":/img/send1.png"), QPixmap(":/img/send2.png"), QPixmap(":/img/send3.png"))
         self.messages = QListView()
         self.messages.setItemDelegate(MessageDelegate())
@@ -128,12 +132,22 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.w)
 
     def message_to(self):
-        self.model.add_message(USER_ME, self.send_input.text())
+        self.model.add_message(USER_ME, self.send_input.toPlainText())
         self.messages.scrollToBottom()
         self.send_input.clear()
 
     def message_from(self):
-        self.model.add_message(USER_THEM, self.send_input.text())
+        self.model.add_message(USER_THEM, self.send_input.toPlainText())
+
+    def message_resize(self):
+        global font
+        rowNum = self.send_input.document().blockCount()
+        if rowNum > MAX_ROWS:
+            rowNum = MAX_ROWS
+        fm = QFontMetrics(font)
+        margins = self.send_input.contentsMargins()
+        height = fm.lineSpacing() * rowNum + (self.send_input.document().documentMargin() + self.send_input.frameWidth()) * 2 + margins.top() + margins.bottom()
+        self.send_input.setFixedHeight(int(height))
 
 
 app = QApplication(sys.argv)
