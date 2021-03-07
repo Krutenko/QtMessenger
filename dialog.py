@@ -1,10 +1,27 @@
 import sys
 
-from PyQt5.QtCore import QAbstractListModel, QMargins, QPoint, Qt, QSize
-from PyQt5.QtGui import QColor, QPixmap, QIcon, QPainter, QFont, QFontDatabase, QFontMetrics
+from PyQt5.QtCore import (
+    QAbstractListModel,
+    QMargins,
+    QPoint,
+    Qt,
+    QSize,
+    QEvent,
+    pyqtSignal,
+)
+from PyQt5.QtGui import (
+    QColor,
+    QPixmap,
+    QIcon,
+    QPainter,
+    QFont,
+    QFontDatabase,
+    QFontMetrics,
+    QKeyEvent,
+)
 from PyQt5.QtWidgets import (
     QApplication,
-    QPlainTextEdit,
+    QTextEdit,
     QListView,
     QMainWindow,
     QPushButton,
@@ -98,6 +115,34 @@ class PicButton(QAbstractButton):
         return QSize(int(0.1 * self.pixmap.size().width()), int(0.1 * self.pixmap.size().width()))
 
 
+class MessageEdit(QTextEdit):
+    returnPressed = pyqtSignal()
+    extendField = pyqtSignal()
+    rowNum = 1
+
+    def __init__(self):
+        super(MessageEdit, self).__init__()
+        self.textChanged.connect(self.count_rows)
+
+    def count_rows(self):
+        rowCnt = 0
+        for idx in range(self.document().blockCount()):
+            rowCnt += 1
+            block = self.document().findBlockByNumber(idx)
+            it = block.begin()
+            while not it.atEnd():
+                fragment = it.fragment()
+                if fragment.isValid():
+                    part = fragment.text()
+                    for i in part:
+                        if ord(i) == 8232:
+                            rowCnt += 1
+                it += 1
+        if rowCnt != self.rowNum:
+            self.rowNum = rowCnt
+            self.extendField.emit()
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         global font
@@ -109,12 +154,13 @@ class MainWindow(QMainWindow):
         self.resize(int(QApplication.primaryScreen().size().width() * 0.3), int(QApplication.primaryScreen().size().height() * 0.5))
         main_layout = QVBoxLayout()
         send_layout = QHBoxLayout()
-        self.send_input = QPlainTextEdit()
+        self.send_input = MessageEdit()
         self.send_input.setPlaceholderText("Enter message")
         self.send_input.setFont(font)
         self.send_input.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.message_resize()
-        self.send_input.textChanged.connect(self.message_resize)
+        self.send_input.extendField.connect(self.message_resize)
+        self.send_input.installEventFilter(self)
         #self.send_input.returnPressed.connect(self.message_to)
         self.send_btn = PicButton(QPixmap(":/img/send1.png"), QPixmap(":/img/send2.png"), QPixmap(":/img/send3.png"))
         self.messages = QListView()
@@ -141,13 +187,21 @@ class MainWindow(QMainWindow):
 
     def message_resize(self):
         global font
-        rowNum = self.send_input.document().blockCount()
+        rowNum = self.send_input.rowNum
         if rowNum > MAX_ROWS:
             rowNum = MAX_ROWS
         fm = QFontMetrics(font)
         margins = self.send_input.contentsMargins()
         height = fm.lineSpacing() * rowNum + (self.send_input.document().documentMargin() + self.send_input.frameWidth()) * 2 + margins.top() + margins.bottom()
         self.send_input.setFixedHeight(int(height))
+
+    def eventFilter(self, widget, event):
+        if event.type() == QEvent.KeyPress:
+            keyEvent = QKeyEvent(event)
+            if (not (keyEvent.modifiers() & Qt.ShiftModifier)) and ((keyEvent.key() == Qt.Key_Enter) or (keyEvent.key() == Qt.Key_Return)):
+                self.message_to()
+                return True
+        return QWidget.eventFilter(self, widget, event)
 
 
 app = QApplication(sys.argv)
