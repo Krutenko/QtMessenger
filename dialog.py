@@ -116,7 +116,6 @@ class PicButton(QAbstractButton):
 
 
 class MessageEdit(QTextEdit):
-    returnPressed = pyqtSignal()
     extendField = pyqtSignal()
     rowNum = 1
 
@@ -125,19 +124,9 @@ class MessageEdit(QTextEdit):
         self.textChanged.connect(self.count_rows)
 
     def count_rows(self):
-        rowCnt = 0
-        for idx in range(self.document().blockCount()):
-            rowCnt += 1
-            block = self.document().findBlockByNumber(idx)
-            it = block.begin()
-            while not it.atEnd():
-                fragment = it.fragment()
-                if fragment.isValid():
-                    part = fragment.text()
-                    for i in part:
-                        if ord(i) == 8232:
-                            rowCnt += 1
-                it += 1
+        height = self.document().documentLayout().documentSize().height()
+        fm = QFontMetrics(font)
+        rowCnt = int((height - (2 * self.document().documentMargin())) / fm.lineSpacing())
         if rowCnt != self.rowNum:
             self.rowNum = rowCnt
             self.extendField.emit()
