@@ -40,6 +40,7 @@ BUBBLE_COLORS = {USER_ME: "#90caf9", USER_THEM: "#a5d6a7"}
 BUBBLE_PADDING = QMargins(15, 5, 15, 5)
 TEXT_PADDING = QMargins(25, 15, 25, 15)
 MAX_ROWS = 8
+APP_NAME = "LobsterMessage"
 font = 0
 
 class MessageDelegate(QStyledItemDelegate):
@@ -115,23 +116,6 @@ class PicButton(QAbstractButton):
         return QSize(int(0.1 * self.pixmap.size().width()), int(0.1 * self.pixmap.size().width()))
 
 
-class MessageEdit(QTextEdit):
-    extendField = pyqtSignal()
-    rowNum = 1
-
-    def __init__(self):
-        super(MessageEdit, self).__init__()
-        self.textChanged.connect(self.count_rows)
-
-    def count_rows(self):
-        height = self.document().documentLayout().documentSize().height()
-        fm = QFontMetrics(font)
-        rowCnt = int((height - (2 * self.document().documentMargin())) / fm.lineSpacing())
-        if rowCnt != self.rowNum:
-            self.rowNum = rowCnt
-            self.extendField.emit()
-
-
 class MainWindow(QMainWindow):
     def __init__(self):
         global font
@@ -143,14 +127,13 @@ class MainWindow(QMainWindow):
         self.resize(int(QApplication.primaryScreen().size().width() * 0.3), int(QApplication.primaryScreen().size().height() * 0.5))
         main_layout = QVBoxLayout()
         send_layout = QHBoxLayout()
-        self.send_input = MessageEdit()
+        self.send_input = QTextEdit()
         self.send_input.setPlaceholderText("Enter message")
         self.send_input.setFont(font)
         self.send_input.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.message_resize()
-        self.send_input.extendField.connect(self.message_resize)
+        self.send_input.textChanged.connect(self.message_resize)
         self.send_input.installEventFilter(self)
-        #self.send_input.returnPressed.connect(self.message_to)
         self.send_btn = PicButton(QPixmap(":/img/send1.png"), QPixmap(":/img/send2.png"), QPixmap(":/img/send3.png"))
         self.messages = QListView()
         self.messages.setItemDelegate(MessageDelegate())
@@ -165,6 +148,7 @@ class MainWindow(QMainWindow):
         self.w = QWidget()
         self.w.setLayout(main_layout)
         self.setCentralWidget(self.w)
+        self.setWindowTitle(APP_NAME)
 
     def message_to(self):
         self.model.add_message(USER_ME, self.send_input.toPlainText())
@@ -176,7 +160,12 @@ class MainWindow(QMainWindow):
 
     def message_resize(self):
         global font
-        rowNum = self.send_input.rowNum
+        height = self.send_input.document().documentLayout().documentSize().height()
+        fm = QFontMetrics(font)
+        space = self.send_input.document().documentMargin()
+        rowNum = int((height - (2 * self.send_input.document().documentMargin())) / fm.lineSpacing())
+        if rowNum == 0:
+            rowNum = 1
         if rowNum > MAX_ROWS:
             rowNum = MAX_ROWS
         fm = QFontMetrics(font)
