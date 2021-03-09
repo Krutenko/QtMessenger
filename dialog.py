@@ -33,6 +33,9 @@ from PyQt5.QtWidgets import (
 )
 
 import resources
+import ctypes
+myappid = u'LanaDigging.Lobster.Messenger.1'
+ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
 USER_ME = 0
 USER_THEM = 1
@@ -41,6 +44,7 @@ BUBBLE_PADDING = QMargins(15, 5, 15, 5)
 TEXT_PADDING = QMargins(25, 15, 25, 15)
 MAX_ROWS = 8
 APP_NAME = "LobsterMessage"
+FONT_SIZE = 14
 font = 0
 
 class MessageDelegate(QStyledItemDelegate):
@@ -122,7 +126,7 @@ class MainWindow(QMainWindow):
         super(MainWindow, self).__init__()
         id = QFontDatabase.addApplicationFont(":/fonts/lobster.ttf");
         family = QFontDatabase.applicationFontFamilies(id)[0];
-        font = QFont(family, 14)
+        font = QFont(family, FONT_SIZE)
         self.setMinimumSize(int(QApplication.primaryScreen().size().width() * 0.1), int(QApplication.primaryScreen().size().height() * 0.2))
         self.resize(int(QApplication.primaryScreen().size().width() * 0.3), int(QApplication.primaryScreen().size().height() * 0.5))
         main_layout = QVBoxLayout()
@@ -149,6 +153,7 @@ class MainWindow(QMainWindow):
         self.w.setLayout(main_layout)
         self.setCentralWidget(self.w)
         self.setWindowTitle(APP_NAME)
+        self.setWindowIcon(QIcon(":/img/logo.png"))
 
     def message_to(self):
         self.model.add_message(USER_ME, self.send_input.toPlainText())
