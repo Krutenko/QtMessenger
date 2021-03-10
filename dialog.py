@@ -147,7 +147,7 @@ class MainWindow(QMainWindow):
         self.send_btn.pressed.connect(self.message_to)
         main_layout.addWidget(self.messages)
         send_layout.addWidget(self.send_input)
-        send_layout.addWidget(self.send_btn)
+        send_layout.addWidget(self.send_btn, 0, Qt.AlignBottom)
         main_layout.addLayout(send_layout)
         self.w = QWidget()
         self.w.setLayout(main_layout)
