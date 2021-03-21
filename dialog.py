@@ -21,6 +21,7 @@ from PyQt5.QtGui import (
     QKeyEvent,
     QTextDocument,
     QTextOption,
+    QPen,
 )
 from PyQt5.QtWidgets import (
     QApplication,
@@ -42,7 +43,11 @@ ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 class Defines():
     USER_ME = 0
     USER_THEM = 1
+    STATUS_UNDELIVERED = 0
+    STATUS_UNREAD = 1
+    STATUS_READ = 2
     BUBBLE_COLORS = {USER_ME: "#90caf9", USER_THEM: "#a5d6a7"}
+    STATUS_COLOR = "#0d7edb"
     BUBBLE_PADDING = QMargins(15, 5, 15, 5)
     TEXT_PADDING = QMargins(25, 15, 25, 15)
     MAX_ROWS = 8
@@ -54,6 +59,7 @@ class Defines():
     SEND_IDLE_IMG = ":/img/send1.png"
     SEND_HOVER_IMG = ":/img/send2.png"
     SEND_PRESS_IMG = ":/img/send3.png"
+    TIMEOUT = 500
 
 window_width = 0
 
@@ -63,6 +69,7 @@ class Message:
         self.size = 0
         self.Y = Y
         self.user = user
+        self.status = Defines.STATUS_UNREAD
 
 class MessageDelegate(QStyledItemDelegate):
     font = 0
@@ -81,25 +88,44 @@ class MessageDelegate(QStyledItemDelegate):
         opt.setWrapMode(opt.WrapAtWordBoundaryOrAnywhere)
         doc.setDefaultTextOption(opt)
         doc.setDefaultFont(self.font)
-        doc.setTextWidth(field.size().width() - 20)
+        if msg.user == Defines.USER_ME:
+            doc.setTextWidth(field.size().width() - 20 - 50)
+        else:
+            doc.setTextWidth(field.size().width() - 20)
         field.setHeight(int(doc.size().height()))
         field.setWidth(int(doc.idealWidth()))
         field = field.marginsAdded(Defines.TEXT_PADDING)
+        line_height = QFontMetrics(self.font).lineSpacing() + Defines.TEXT_PADDING.bottom() - Defines.BUBBLE_PADDING.bottom() + Defines.TEXT_PADDING.top() - Defines.BUBBLE_PADDING.top()
         if msg.user == Defines.USER_ME:
             rect = QRect(option.rect.right() - field.size().width() - 20, msg.Y, field.size().width(), field.size().height())
         else:
             rect = QRect(20, msg.Y, field.size().width(), field.size().height())
         bubblerect = rect.marginsRemoved(Defines.BUBBLE_PADDING)
         textrect = rect.marginsRemoved(Defines.TEXT_PADDING)
+        if msg.user == Defines.USER_ME:
+            p1 = bubblerect.topRight()
+            p2 = bubblerect.bottomLeft() + QPoint(-36, -int(line_height / 2))
+        else:
+            p1 = bubblerect.topLeft()
+        painter.setRenderHint(QPainter.Antialiasing)
         painter.setPen(Qt.NoPen)
         color = QColor(Defines.BUBBLE_COLORS[msg.user])
         painter.setBrush(color)
         painter.drawRoundedRect(bubblerect, 10, 10)
-        if msg.user == Defines.USER_ME:
-            p1 = bubblerect.topRight()
-        else:
-            p1 = bubblerect.topLeft()
         painter.drawPolygon(p1 + QPoint(-20, 0), p1 + QPoint(20, 0), p1 + QPoint(0, 15))
+        if msg.user == Defines.USER_ME:
+            if msg.status == Defines.STATUS_UNREAD:
+                painter.setPen(Qt.NoPen)
+                painter.setBrush(QColor(Defines.STATUS_COLOR))
+                painter.drawEllipse(p2, 7, 7)
+            elif msg.status == Defines.STATUS_UNDELIVERED:
+                pen = QPen(QColor(Defines.STATUS_COLOR))
+                pen.setWidth(2)
+                painter.setPen(pen)
+                painter.setBrush(Qt.NoBrush)
+                painter.drawEllipse(p2, 7, 7)
+                painter.drawLine(p2, p2 + QPoint(0, -5))
+                painter.drawLine(p2, p2 + QPoint(3, 0))
         painter.setPen(Qt.black)
         painter.setFont(self.font)
         painter.translate(textrect.x(), textrect.y())
@@ -120,7 +146,10 @@ class MessageDelegate(QStyledItemDelegate):
         opt.setWrapMode(opt.WrapAtWordBoundaryOrAnywhere)
         doc.setDefaultTextOption(opt)
         doc.setDefaultFont(self.font)
-        doc.setTextWidth(field.size().width() - 20)
+        if msg.user == Defines.USER_ME:
+            doc.setTextWidth(field.size().width() - 20 - 50)
+        else:
+            doc.setTextWidth(field.size().width() - 20)
         field.setHeight(int(doc.size().height()))
         field.setWidth(int(doc.idealWidth()))
         field = field.marginsAdded(Defines.TEXT_PADDING)
