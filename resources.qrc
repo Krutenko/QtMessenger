@@ -4,7 +4,6 @@
         <file alias="send1.png">images/send1.png</file>
         <file alias="send2.png">images/send2.png</file>
         <file alias="send3.png">images/send3.png</file>
-        <file alias="back.jpg">images/back.jpg</file>
     </qresource>
     <qresource prefix="fonts">
         <file alias="lobster.ttf">fonts/lobster.ttf</file>

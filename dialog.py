@@ -36,11 +36,13 @@ from PyQt5.QtWidgets import (
 )
 
 import resources
+from network import network
+
 import ctypes
 myappid = u'LanaDigging.Lobster.Messenger.1'
 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
-class Defines():
+class Defines:
     USER_ME = 0
     USER_THEM = 1
     STATUS_UNDELIVERED = 0
@@ -177,15 +179,31 @@ class MessageModel(QAbstractListModel):
                 self.messages[i].Y = curY
                 curY += self.messages[i].size
 
+    def setUndelivered(self, id):
+        if self.messages[id].status != Defines.STATUS_UNDELIVERED:
+            self.messages[id].status = Defines.STATUS_UNDELIVERED
+            self.layoutChanged()
+
+    def setUnread(self, id):
+        if self.messages[id].status != Defines.STATUS_UNREAD:
+            self.messages[id].status = Defines.STATUS_UNREAD
+            self.layoutChanged()
+
+    def setRead(self, id):
+        if self.messages[id].status != Defines.STATUS_READ:
+            self.messages[id].status = Defines.STATUS_READ
+            self.layoutChanged.emit()
+
     def add_message(self, text, user):
         if text:
             length = len(self.messages)
             Y = 0
             if length != 0:
                 Y = self.messages[length - 1].size + self.messages[length - 1].Y
-            cur = len(self.messages)
             self.messages.append(Message(text, Y, user))
             self.layoutChanged.emit()
+            return length
+
 
 class PicButton(QAbstractButton):
     def __init__(self, pixmap, pixmap_hover, pixmap_pressed, parent=None):
@@ -237,10 +255,14 @@ class MainWindow(QMainWindow):
         self.send_btn = PicButton(QPixmap(Defines.SEND_IDLE_IMG), QPixmap(Defines.SEND_HOVER_IMG), QPixmap(Defines.SEND_PRESS_IMG))
         self.messages = QListView()
         self.messages.setItemDelegate(MessageDelegate(self.font))
-        #self.messages.setStyleSheet("background-image: url(:/img/back.jpg);");
         self.model = MessageModel()
         self.messages.setModel(self.model)
-        self.send_btn.pressed.connect(self.message_from)
+        self.network = network()
+        self.send_btn.pressed.connect(self.message_to)
+        self.network.received.connect(self.message_from)
+        self.network.undelivered.connect(self.undelivered_status)
+        self.network.delivered.connect(self.delivered_status)
+        self.network.read.connect(self.read_status)
         main_layout.addWidget(self.messages)
         send_layout.addWidget(self.send_input)
         send_layout.addWidget(self.send_btn, 0, Qt.AlignBottom)
@@ -253,14 +275,23 @@ class MainWindow(QMainWindow):
         self.message_resize()
 
     def message_to(self):
-        self.model.add_message(self.send_input.toPlainText(), Defines.USER_ME)
+        msg = self.send_input.toPlainText()
+        id = self.model.add_message(msg, Defines.USER_ME)
+        self.network.send(id, msg)
         self.messages.scrollToBottom()
         self.send_input.clear()
 
-    def message_from(self):
-        self.model.add_message(self.send_input.toPlainText(), Defines.USER_THEM)
-        self.messages.scrollToBottom()
-        self.send_input.clear()
+    def message_from(self, msg):
+        self.model.add_message(msg, Defines.USER_THEM)
+
+    def undelivered_status(self, id):
+        self.model.setUndelivered(id)
+
+    def delivered_status(self, id):
+        self.model.setUnread(id)
+
+    def read_status(self, id):
+        self.model.setRead(id)
 
     def message_resize(self):
         height = self.send_input.document().documentLayout().documentSize().height()
