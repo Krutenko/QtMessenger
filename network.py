@@ -288,8 +288,9 @@ class network(QObject):
     undelivered = pyqtSignal(int, str)  # emit when timeout is off and the message isn't delivered
     delivered = pyqtSignal(int, str)  # emit when delivered
     read = pyqtSignal(int, str)  # emit when read
+    client_connected = pyqtSignal(str)  # str - ip
 
-    def __init__(self, ip: str):
+    def __init__(self, ip: str = '127.0.0.1'):
         super(network, self).__init__()
 
         self.queue_tx = Queue()  # queue of (id_client, message) for transmission
@@ -328,7 +329,7 @@ class network(QObject):
             try:
                 conn = self.clients_connections[addr[0]]
             except KeyError:
-                self.signal_undelivered(msg.header.id_message())
+                self.signal_undelivered(msg.header.id_message(), address[0])
                 continue
 
             conn.send(msg.raw())
@@ -340,7 +341,7 @@ class network(QObject):
             connection, addr = self.socket_listener.accept()
             self.clients_connections[addr[0]] = connection
             threading.Thread(target=self.worker_client_listener, args=(connection, addr)).start()
-            self.signal_client_connected(addr)  # signal_client_connected = pyqtSignal((str, int))
+            self.signal_client_connected(addr[0])  # client_connected = pyqtSignal((str, int))
 
     def worker_client_listener(self, connection, address: (str, int)):
         while True:
@@ -368,10 +369,10 @@ class network(QObject):
                 self.got_session_key(address, data[:512], data[512:])
                 continue
             elif flag_recvd:
-                self.signal_delivered(header.id_message())
+                self.signal_delivered(header.id_message(), address[0])
                 continue
             elif flag_read:
-                self.signal_read(header.id_message())
+                self.signal_read(header.id_message(), address[0])
                 continue
 
             data = connection.recv(header.length() - Header.len_predef())
@@ -426,14 +427,14 @@ class network(QObject):
         self.send_any_message(Message.key_request(), address)
 
     # INTERFACE
-    def signal_delivered(self, id_message: int):
+    def signal_delivered(self, id_message: int, ip: str):
         # отправить на фронтенд сигнал, что сообщение получено
-        self.delivered.emit(id_message)
+        self.delivered.emit(id_message, ip)
 
     # INTERFACE
-    def signal_read(self, id_message: int):
+    def signal_read(self, id_message: int, ip: str):
         # отправить на фронтенд сигнал, что сообщение прочитано
-        self.read.emit(id_message)
+        self.read.emit(id_message, ip)
 
     # INTERFACE
     def signal_message_sent(self, id_message: int):
@@ -441,13 +442,18 @@ class network(QObject):
         pass
 
     # INTERFACE
-    def signal_undelivered(self, id_message: int):
+    def signal_client_connected(self, ip: str):
+        # отправить на фронтенд сигнал, что клиент подключился
+        self.client_connected.emit(ip)
+
+    # INTERFACE
+    def signal_undelivered(self, id_message: int, ip: str):
         # отправить на фронтенд сигнал, что сообщение не доставлено
-        self.undelivered.emit(id_message)
+        self.undelivered.emit(id_message, ip)
 
     # INTERFACE
     def send_received(self, message: Message, address: (str, int)):
-        self.recieved.emit(message.payload)
+        self.recieved.emit(message.payload, address[0])
         msg = Message.state_received(message.id_message)
         self.send_any_message(msg, address)
 
