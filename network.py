@@ -283,11 +283,11 @@ class Message:
 
 
 class network(QObject):
-    received = pyqtSignal(str)  # str is the received message
+    received = pyqtSignal(str, str)  # str is the received message
     # int for the next three signals is message id from the send function
-    undelivered = pyqtSignal(int)  # emit when timeout is off and the message isn't delivered
-    delivered = pyqtSignal(int)  # emit when delivered
-    read = pyqtSignal(int)  # emit when read
+    undelivered = pyqtSignal(int, str)  # emit when timeout is off and the message isn't delivered
+    delivered = pyqtSignal(int, str)  # emit when delivered
+    read = pyqtSignal(int, str)  # emit when read
 
     def __init__(self, ip: str):
         super(network, self).__init__()
@@ -445,8 +445,10 @@ class network(QObject):
         # отправить на фронтенд сигнал, что сообщение не доставлено
         self.undelivered.emit(id_message)
 
-    def send_received(self, id_message: int, address: (str, int)):
-        msg = Message.state_received(id_message)
+    # INTERFACE
+    def send_received(self, message: Message, address: (str, int)):
+        self.recieved.emit(message.payload)
+        msg = Message.state_received(message.id_message)
         self.send_any_message(msg, address)
 
     # INTERFACE METHOD
@@ -458,12 +460,12 @@ class network(QObject):
     # INTERFACE METHOD
     # Отправка сообщения.
     # message  полезная нагрузка в формате bytes
-    def send_message(self, id_message: int, message: bytes, ip: str):
+    def send_message(self, id_message: int, message: str, ip: str):
         key, iv = (self.clients_keys[ip])[0]
-        msg = Message.message(AES_encrypt(message, key, iv),
+        msg = Message.message(AES_encrypt(message.encode(), key, iv),
                               id_message)
         self.send_any_message(msg, (ip, PORT_DEF))
-        self.messages_log.append(('T', ip, message))
+        self.messages_log.append(('T', ip, message.encode()))
 
     # INTERFACE METHOD
     def connect_to(self, ip: str):
@@ -472,7 +474,10 @@ class network(QObject):
             self.clients_connections[ip].connect((ip, PORT_DEF))
         except socket.error as e:
             print(str(e))
+            return False
 
         threading.Thread(target=self.worker_client_listener, args=(self.clients_connections[ip], (ip, PORT_DEF))).start()
 
         self.init_session_key((ip, PORT_DEF))  # TODO мб еще когда-то запрашивать новый сеансовый ключ
+
+        return True
