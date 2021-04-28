@@ -1,0 +1,3 @@
+{
+    "files": ["dialog.py","resources.qrc","resources.py","network.py"]
+}
