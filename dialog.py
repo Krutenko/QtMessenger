@@ -30,6 +30,8 @@ from PyQt5.QtWidgets import (
     QStyledItemDelegate,
     QAbstractButton,
     QTextEdit,
+    QLabel,
+    QLineEdit
 )
 
 class Message:
@@ -93,7 +95,7 @@ class MessageDelegate(QStyledItemDelegate):
                 painter.drawEllipse(p2, 7, 7)
                 painter.drawLine(p2, p2 + QPoint(0, -5))
                 painter.drawLine(p2, p2 + QPoint(3, 0))
-        painter.setPen(Qt.black)
+        painter.setPen(Qt.gray)
         painter.setFont(variables.font)
         painter.translate(textrect.x(), textrect.y())
         textrectf = QRectF(textrect)
@@ -104,7 +106,7 @@ class MessageDelegate(QStyledItemDelegate):
     def sizeHint(self, option, index):
         msg = index.model().data(index, Qt.DisplayRole)
         field = QRect(option.rect)
-        field.setWidth(variables.window_width - 30)
+        field.setWidth(variables.window_width - variables.WINDOW_PADDING)
         field = field.marginsRemoved(variables.TEXT_PADDING)
         doc = QTextDocument(msg.text)
         doc.setDocumentMargin(0)
@@ -198,9 +200,11 @@ class PicButton(QAbstractButton):
 
 class Dialog(QWidget):
 
-    def __init__(self):
+    def __init__(self, ip):
         super(Dialog, self).__init__()
+        self.ip = ip
         self.main_layout = QVBoxLayout()
+        self.header_layout = QHBoxLayout()
         self.send_layout = QHBoxLayout()
         self.send_input = QTextEdit()
         self.send_input.setPlaceholderText(variables.PLACEHOLDER_TEXT)
@@ -209,32 +213,40 @@ class Dialog(QWidget):
         self.send_input.textChanged.connect(self.message_resize)
         self.send_input.installEventFilter(self)
         self.send_btn = PicButton(QPixmap(variables.SEND_IDLE_IMG), QPixmap(variables.SEND_HOVER_IMG), QPixmap(variables.SEND_PRESS_IMG))
+        self.back_btn = PicButton(QPixmap(variables.BACK_IDLE_IMG), QPixmap(variables.BACK_HOVER_IMG), QPixmap(variables.BACK_PRESS_IMG))
+        self.ip_label = QLabel(ip)
+        self.ip_label.setFont(variables.font)
         self.messages = QListView()
         self.messages.setItemDelegate(MessageDelegate())
         self.model = MessageModel()
         self.messages.setModel(self.model)
-        self.network = network()
-        self.send_btn.pressed.connect(self.message_to)
-        self.network.received.connect(self.message_from)
-        self.network.undelivered.connect(self.undelivered_status)
-        self.network.delivered.connect(self.delivered_status)
-        self.network.read.connect(self.read_status)
+        self.send_btn.released.connect(self.message_to)
+        self.back_btn.released.connect(self.return_to_menu)
+        self.header_layout.addWidget(self.back_btn, 0, Qt.AlignVCenter | Qt.AlignLeft)
+        self.header_layout.addWidget(self.ip_label, 0, Qt.AlignVCenter | Qt.AlignLeft)
+        self.header_layout.addStretch()
+        self.main_layout.addLayout(self.header_layout)
         self.main_layout.addWidget(self.messages)
         self.send_layout.addWidget(self.send_input)
         self.send_layout.addWidget(self.send_btn, 0, Qt.AlignBottom)
         self.main_layout.addLayout(self.send_layout)
         self.setLayout(self.main_layout)
-        self.send_input.setFocus()
+        self.message_resize()
+
+    def return_to_menu(self):
+        variables.signals.close_dialog.emit()
 
     def message_to(self):
         msg = self.send_input.toPlainText()
         id = self.model.add_message(msg, variables.USER_ME)
-        self.network.send_message(id, msg)
+        variables.nw.send_message(id, msg, self.ip)
         self.messages.scrollToBottom()
         self.send_input.clear()
         self.send_input.setFocus()
 
     def message_from(self, msg):
+        print(msg)
+        print(self.ip)
         self.model.add_message(msg, variables.USER_THEM)
 
     def undelivered_status(self, id):

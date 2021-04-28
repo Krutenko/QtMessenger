@@ -11,10 +11,12 @@ from Crypto.Util.Padding import pad
 from Crypto.Util.Padding import unpad
 from Crypto.Util.number import getPrime
 from Crypto.Random import get_random_bytes
+import ifaddr
+
 
 PRIME_LENGTH = 256
 MAX_LENGTH = PRIME_LENGTH * 2
-PORT_DEF = 55777  # application port
+PORT_DEF = 55778  # application port
 
 
 # возвращаемый аргумент x является мультипликативно обратным к a, b - модуль
@@ -225,8 +227,8 @@ class Header:  # header length is 9 bytes  #  0000[read][recvd][key_h][key_l]
     def from_raw(cls, raw_message: bytes):
         flag_key_l, flag_key_h, flag_recvd, flag_read = Header.parse_flags(raw_message[8:9])
         return cls(int.from_bytes(raw_message[:4], 'big'),
-                   int.from_bytes(raw_message[4:8], 'big'),
-                   flag_key_l, flag_key_h, flag_recvd, flag_read)
+                   flag_key_l, flag_key_h, flag_recvd, flag_read,
+                   int.from_bytes(raw_message[4:8], 'big'))
 
     def raw(self):
         return self.header_data
@@ -242,19 +244,19 @@ class Header:  # header length is 9 bytes  #  0000[read][recvd][key_h][key_l]
 
 
 class Message:
-    def __init__(self, header: Header, id_message=0, payload: bytes = None):
+    def __init__(self, header: Header, payload: bytes = None):
         self.header = header
         self.payload = payload
-        self.id_message = id_message
+        self.id_message = header.id_message()
 
     @classmethod
     def message(cls, payload: bytes, id_message: int):
-        return cls(header=Header(length=len(payload) + Header.len_predef()),
-                   id_message=id_message,
+        return cls(header=Header(length=len(payload) + Header.len_predef(), id_message=id_message),
                    payload=payload)
 
     @classmethod
     def key_request(cls):
+        print('key_request')
         return cls(header=Header(length=Header.len_predef(), flag_key_l=True))
 
     # |e| = 2 bytes, |n| = 512 bytes
@@ -289,9 +291,13 @@ class network(QObject):
     delivered = pyqtSignal(int, str)  # emit when delivered
     read = pyqtSignal(int, str)  # emit when read
     client_connected = pyqtSignal(str)  # str - ip
+    connection_established = pyqtSignal(bool, str)  # true/false, ip
+    exit_event = threading.Event()
 
-    def __init__(self, ip: str = '127.0.0.1'):
+    def __init__(self):
         super(network, self).__init__()
+
+        self.restricted_ip = ['127.0.0.1']
 
         self.queue_tx = Queue()  # queue of (id_client, message) for transmission
         self.queue_rx = Queue()  # queue of (id_client, message) received
@@ -300,23 +306,38 @@ class network(QObject):
 
         self.clients_connections = {}  # 'ip': connection
         self.clients_keys = {}  # 'ip': ((key, iv), (d, n)) # (d, n) - private key, maybe None if not needed
+        self.listeners = []  # array of sockets
 
-        # Init socket
-        self.socket_listener = socket.socket()
-        while True:
-            try:
-                self.socket_listener.bind((ip, PORT_DEF))
-                break
-            except socket.error as e:
-                print(str(e))
+        # Init sockets
+        adapters = ifaddr.get_adapters()
+
+        for adapter in adapters:
+            for ip_ in adapter.ips:
+                if isinstance(ip_.ip, str):
+                    s = socket.socket()
+                    try:
+                        s.bind((ip_.ip, PORT_DEF))
+                    except Exception as e:
+                        continue
+                    print('Listening on ' + ip_.ip + ':' + str(PORT_DEF))
+                    self.listeners.append(s)
+                    threading.Thread(target=self.worker_main_listener, args=(s,)).start()
 
         self.thread_sender = threading.Thread(target=self.worker_sender).start()
-        self.thread_main_listener = threading.Thread(target=self.worker_main_listener).start()
 
     def __del__(self):
-        self.socket_listener.close()
+        self.exit_event.set()
+
         for s in self.clients_connections:
-            s.close()
+            try:
+                s.close()
+            except:
+                pass
+        for s in self.listeners:
+            try:
+                s.close()
+            except:
+                pass
 
     # def restore_msg_log(self, log: list):
     #     # TODO
@@ -324,6 +345,9 @@ class network(QObject):
 
     def worker_sender(self):
         while True:
+            if self.exit_event.is_set():
+                break
+
             addr, msg = self.queue_tx.get()  # this awaits until an item is available
 
             try:
@@ -333,18 +357,43 @@ class network(QObject):
                 continue
 
             conn.send(msg.raw())
-            self.signal_message_sent(msg.header.id_message())
+            if msg.header.id_message():
+                self.signal_message_sent(msg.header.id_message())
 
-    def worker_main_listener(self):
-        self.socket_listener.listen(10)
+    def worker_main_listener(self, socket_):
+        socket_.listen(10)
         while True:
-            connection, addr = self.socket_listener.accept()
+            if self.exit_event.is_set():
+                break
+
+            connection, addr = socket_.accept()
             self.clients_connections[addr[0]] = connection
-            threading.Thread(target=self.worker_client_listener, args=(connection, addr)).start()
-            self.signal_client_connected(addr[0])  # client_connected = pyqtSignal((str, int))
+            threading.Thread(target=self.worker_client_listener, args=(addr, connection)).start()
+            print('Inbound connection: ' + addr[0])
+            self.signal_client_connected(addr[0])
 
-    def worker_client_listener(self, connection, address: (str, int)):
+    def worker_client_listener(self, address: (str, int), connection_ = None):
+        if connection_ is None:
+            s = socket.socket()
+            try:
+                s.connect(address)
+            except Exception as e:
+                print('Error: ' + str(e))
+                s.close()
+                self.connection_established.emit(False, address[0])
+                return
+            self.clients_connections[address[0]] = s
+            connection = self.clients_connections[address[0]]
+            self.init_session_key(address)  # TODO мб еще когда-то запрашивать новый сеансовый ключ
+            self.connection_established.emit(True, address[0])
+        else:
+            connection = connection_
+
+
         while True:
+            if self.exit_event.is_set():
+                break
+
             try:
                 header_raw = connection.recv(Header.len_predef())
             except:
@@ -352,8 +401,10 @@ class network(QObject):
             header = Header.from_raw(header_raw)
             flag_key_l, flag_key_h, flag_recvd, flag_read = header.parse_flags(header.flags())
 
+            print('recvd vvv')
             print(header.length())
             print(header.header_data)
+            print('^^^')
 
             if flag_key_l and not flag_key_h:
                 self.got_rsa_req(address)
@@ -385,7 +436,7 @@ class network(QObject):
             print(data_decrypted)
 
             message = Message(header, data_decrypted)
-            self.send_received(header.id_message(), address)  # подтверждаем принятие
+            self.send_received(message, address)  # подтверждаем принятие
             self.queue_rx.put((address, message))
             self.messages_log.append(('R', address[0], message))
 
@@ -417,7 +468,7 @@ class network(QObject):
         self.clients_keys[address[0]] = ((key, iv), None)
 
     def send_any_message(self, message: Message, address: (str, int)):
-        print('vvv')
+        print('sent vvv')
         print(message.header.header_data)
         print(message.header.length())
         print('^^^')
@@ -453,7 +504,7 @@ class network(QObject):
 
     # INTERFACE
     def send_received(self, message: Message, address: (str, int)):
-        self.recieved.emit(message.payload, address[0])
+        self.received.emit(message.payload, address[0])
         msg = Message.state_received(message.id_message)
         self.send_any_message(msg, address)
 
@@ -475,15 +526,9 @@ class network(QObject):
 
     # INTERFACE METHOD
     def connect_to(self, ip: str):
-        self.clients_connections[ip] = socket.socket()
-        try:
-            self.clients_connections[ip].connect((ip, PORT_DEF))
-        except socket.error as e:
-            print(str(e))
+        if ip in self.restricted_ip:
             return False
 
-        threading.Thread(target=self.worker_client_listener, args=(self.clients_connections[ip], (ip, PORT_DEF))).start()
-
-        self.init_session_key((ip, PORT_DEF))  # TODO мб еще когда-то запрашивать новый сеансовый ключ
+        threading.Thread(target=self.worker_client_listener, args=((ip, PORT_DEF), None)).start()
 
         return True
