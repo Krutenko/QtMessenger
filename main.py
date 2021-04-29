@@ -33,7 +33,10 @@ class MainWindow(QMainWindow):
         variables.signals.create_dialog.connect(self.createDialog)
         variables.signals.open_dialog.connect(self.openDialog)
         variables.signals.close_dialog.connect(self.closeDialog)
+        variables.signals.message_sent.connect(self.messageSent)
         variables.nw.received.connect(self.receiveMessage)
+        variables.nw.undelivered.connect(self.undelivered)
+        variables.nw.read.connect(self.read)
         self.dialogs = []
         self.dialog_menu = DialogList()
         self.main_widget = QStackedWidget()
@@ -41,6 +44,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.main_widget)
         self.setWindowTitle(variables.APP_NAME)
         self.setWindowIcon(QIcon(variables.LOGO_IMG))
+        self.dialog_menu.ip_input.setFocus()
 
     def resizeEvent(self, event):
         super(MainWindow, self).resizeEvent(event)
@@ -52,7 +56,9 @@ class MainWindow(QMainWindow):
     def openDialog(self, id):
         self.main_widget.addWidget(self.dialogs[id])
         self.main_widget.setCurrentIndex(1)
+        self.dialog_menu.set_status(id, variables.STATUS_READ)
         self.dialogs[id].send_input.setFocus()
+        self.dialogs[id].send_read()
 
     def closeDialog(self):
         self.main_widget.setCurrentIndex(0)
@@ -63,10 +69,28 @@ class MainWindow(QMainWindow):
             if self.dialogs[i].ip == ip:
                 self.dialogs[i].message_from(msg)
                 if self.main_widget.currentIndex() == 1 and self.main_widget.currentWidget().ip == ip:
-                    break
+                    variables.nw.send_read(self.dialogs[i].model.rowCount(), ip)
                 else:
-                    self.dialog_menu.model.new_msg(i)
-                self.dialog_menu.model.last_msg(i, msg)
+                    self.dialog_menu.model.set_status(i, variables.STATUS_NEW)
+                self.dialog_menu.model.last_msg(i, msg, USER_THEM)
+
+    def messageSent(self, msg, ip):
+        for i in range(len(self.dialogs)):
+            if self.dialogs[i].ip == ip:
+                self.dialog_menu.model.last_msg(i, msg, USER_THEM)
+
+    def undelivered(self, id, ip):
+        for i in range(len(self.dialogs)):
+            if self.dialogs[i].ip == ip:
+                self.dialogs[i].model.setStatus(id, variables.STATUS_UNDELIVERED)
+                self.dialog_menu.model.set_status(id, variables.STATUS_UNDELIVERED)
+
+    def read(self, id, ip):
+        for i in range(len(self.dialogs)):
+            if self.dialogs[i].ip == ip:
+                self.dialogs[i].model.setStatus(id, variables.STATUS_READ)
+                self.dialog_menu.model.set_status(id, variables.STATUS_READ)
+
 
 app = QApplication(sys.argv)
 window = MainWindow()

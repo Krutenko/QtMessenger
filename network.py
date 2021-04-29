@@ -304,6 +304,7 @@ class network(QObject):
         self.messages_log = []  # list of ('<T/R>', <ip>, <message>) - all users' msgs. T-transmission, R - receive
         # self.restore_msg_log(self.messages_log)  # TODO: update from offline cache on init
 
+        self.clients_states = []  # 'ip' # all ever connected clients' IPs
         self.clients_connections = {}  # 'ip': connection
         self.clients_keys = {}  # 'ip': ((key, iv), (d, n)) # (d, n) - private key, maybe None if not needed
         self.listeners = []  # array of sockets
@@ -321,6 +322,7 @@ class network(QObject):
                         continue
                     print('Listening on ' + ip_.ip + ':' + str(PORT_DEF))
                     self.listeners.append(s)
+                    self.restricted_ip.append(ip_.ip)
                     threading.Thread(target=self.worker_main_listener, args=(s,)).start()
 
         self.thread_sender = threading.Thread(target=self.worker_sender).start()
@@ -384,7 +386,12 @@ class network(QObject):
                 return
             self.clients_connections[address[0]] = s
             connection = self.clients_connections[address[0]]
+
+            if address[0] not in self.clients_states:
+                self.clients_states.append(address[0])
+
             self.init_session_key(address)  # TODO мб еще когда-то запрашивать новый сеансовый ключ
+
             self.connection_established.emit(True, address[0])
         else:
             connection = connection_
@@ -494,8 +501,10 @@ class network(QObject):
 
     # INTERFACE
     def signal_client_connected(self, ip: str):
-        # отправить на фронтенд сигнал, что клиент подключился
-        self.client_connected.emit(ip)
+        # отправить на фронтенд сигнал, что клиент подключился, если он не подключался ранее
+        if ip not in self.clients_states:
+            self.client_connected.emit(ip)
+            self.clients_states.append(ip)
 
     # INTERFACE
     def signal_undelivered(self, id_message: int, ip: str):

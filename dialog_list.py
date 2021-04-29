@@ -91,7 +91,7 @@ class DialogDelegate(QStyledItemDelegate):
         spainter = QStylePainter(painter.device(), QWidget())
         spainter.setRenderHint(QPainter.Antialiasing)
         if fm.horizontalAdvance(string) > textrect.width():
-            fade = QLinearGradient(variables.MSG_PADDING.left() + textrect.width() - 200, 0, variables.MSG_PADDING.left() + textrect.width(), 0)
+            fade = QLinearGradient(variables.MSG_PADDING.left() + textrect.width()* 0.9, 0, variables.MSG_PADDING.left() + textrect.width(), 0)
             fade.setSpread(QGradient.PadSpread)
             fade.setColorAt(0, Qt.darkGray)
             fade.setColorAt(1, color)
@@ -164,14 +164,20 @@ class DialogModel(QAbstractListModel):
         pass
 
     def add_dialog(self, ip):
-        self.dialogs.append(Dialog(ip, 0, variables.USER_THEM, "qwerty", variables.STATUS_READ))
+        self.dialogs.append(Dialog(ip, len(self.dialogs), variables.USER_THEM, "qwerty", variables.STATUS_READ))
+        self.set_first(self.dialogs[-1])
         self.layoutChanged.emit()
 
-    def last_msg(self, id, msg):
+    def last_msg(self, id, msg, user):
         self.dialogs[id].msg = msg
+        self.dialogs[id].status = variables.STATUS_UNREAD
+        self.dialogs[id].user = user
+        self.set_first(id)
+        self.layoutChanged.emit()
 
-    def new_msg(self, id):
-        self.dialogs[id].status = variables.STATUS_NEW
+    def set_status(self, id, status):
+        self.dialogs[id].status = status
+        self.layoutChanged.emit()
 
 
 class DialogList(QWidget):

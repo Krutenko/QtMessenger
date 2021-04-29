@@ -145,20 +145,9 @@ class MessageModel(QAbstractListModel):
                 self.messages[i].Y = curY
                 curY += self.messages[i].size
 
-    def setUndelivered(self, id):
-        if self.messages[id].status != variables.STATUS_UNDELIVERED:
-            self.messages[id].status = variables.STATUS_UNDELIVERED
-            self.layoutChanged()
-
-    def setUnread(self, id):
-        if self.messages[id].status != variables.STATUS_UNREAD:
-            self.messages[id].status = variables.STATUS_UNREAD
-            self.layoutChanged()
-
-    def setRead(self, id):
-        if self.messages[id].status != variables.STATUS_READ:
-            self.messages[id].status = variables.STATUS_READ
-            self.layoutChanged.emit()
+    def setStatus(self, id, status):
+        self.messages[id].status = status
+        self.layoutChanged()
 
     def add_message(self, text, user):
         if text:
@@ -169,6 +158,9 @@ class MessageModel(QAbstractListModel):
             self.messages.append(Message(text, Y, user))
             self.layoutChanged.emit()
             return length
+
+    def send_read():
+        pass
 
 
 class PicButton(QAbstractButton):
@@ -240,6 +232,7 @@ class Dialog(QWidget):
         msg = self.send_input.toPlainText()
         id = self.model.add_message(msg, variables.USER_ME)
         variables.nw.send_message(id, msg, self.ip)
+        variables.signals.message_sent.emit(msg, self.ip)
         self.messages.scrollToBottom()
         self.send_input.clear()
         self.send_input.setFocus()

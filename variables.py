@@ -8,6 +8,7 @@ class DialogSignals(QObject):
     open_dialog = pyqtSignal(int)
     create_dialog = pyqtSignal(str)
     close_dialog = pyqtSignal()
+    message_sent = pyqtSignal(int, str)
 
     def __init__(self):
         super(DialogSignals, self).__init__()
