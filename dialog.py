@@ -159,7 +159,7 @@ class MessageModel(QAbstractListModel):
             self.layoutChanged.emit()
             return length
 
-    def send_read():
+    def send_read(self):
         pass
 
 

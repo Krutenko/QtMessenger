@@ -56,9 +56,9 @@ class MainWindow(QMainWindow):
     def openDialog(self, id):
         self.main_widget.addWidget(self.dialogs[id])
         self.main_widget.setCurrentIndex(1)
-        self.dialog_menu.set_status(id, variables.STATUS_READ)
+        self.dialog_menu.model.set_status(id, variables.STATUS_READ)
         self.dialogs[id].send_input.setFocus()
-        self.dialogs[id].send_read()
+        self.dialogs[id].model.send_read()
 
     def closeDialog(self):
         self.main_widget.setCurrentIndex(0)
@@ -71,13 +71,14 @@ class MainWindow(QMainWindow):
                 if self.main_widget.currentIndex() == 1 and self.main_widget.currentWidget().ip == ip:
                     variables.nw.send_read(self.dialogs[i].model.rowCount(), ip)
                 else:
+                    print("Here")
                     self.dialog_menu.model.set_status(i, variables.STATUS_NEW)
-                self.dialog_menu.model.last_msg(i, msg, USER_THEM)
+                self.dialog_menu.model.last_msg(i, msg, variables.USER_THEM)
 
     def messageSent(self, msg, ip):
         for i in range(len(self.dialogs)):
             if self.dialogs[i].ip == ip:
-                self.dialog_menu.model.last_msg(i, msg, USER_THEM)
+                self.dialog_menu.model.last_msg(i, msg, variables.USER_THEM)
 
     def undelivered(self, id, ip):
         for i in range(len(self.dialogs)):
