@@ -36,10 +36,9 @@ from PyQt5.QtWidgets import (
 )
 
 class Message:
-    def __init__(self, text, Y, user):
+    def __init__(self, text, user):
         self.text = text
         self.size = 0
-        self.Y = Y
         self.user = user
         self.status = variables.STATUS_UNREAD
 
@@ -122,7 +121,6 @@ class MessageDelegate(QStyledItemDelegate):
         field.setHeight(int(doc.size().height()))
         field.setWidth(int(doc.idealWidth()))
         field = field.marginsAdded(variables.TEXT_PADDING)
-        index.model().setSize(index, field.size().height())
         return QSize(0, field.size().height())
 
 
@@ -139,14 +137,6 @@ class MessageModel(QAbstractListModel):
     def rowCount(self, index):
         return len(self.messages)
 
-    def setSize(self, index, size):
-        if (size != self.messages[index.row()].size):
-            self.messages[index.row()].size = size
-            curY = self.messages[index.row()].Y + size
-            for i in range(index.row() + 1, len(self.messages)):
-                self.messages[i].Y = curY
-                curY += self.messages[i].size
-
     def setStatus(self, id, status):
         self.messages[id].status = status
         self.layoutChanged.emit()
@@ -154,10 +144,7 @@ class MessageModel(QAbstractListModel):
     def add_message(self, text, user):
         if text:
             length = len(self.messages)
-            Y = 0
-            if length != 0:
-                Y = self.messages[length - 1].size + self.messages[length - 1].Y
-            self.messages.append(Message(text, Y, user))
+            self.messages.append(Message(text, user))
             self.layoutChanged.emit()
             return length
 

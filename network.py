@@ -316,7 +316,7 @@ class network(QObject):
 
         self.logger.setLevel(logging.INFO)
         ch = logging.FileHandler(logpath)
-        logger.addHandler(ch)
+        self.logger.addHandler(ch)
 
         # Init sockets
         adapters = ifaddr.get_adapters()
@@ -364,7 +364,7 @@ class network(QObject):
             try:
                 conn = self.clients_connections[addr[0]]
             except KeyError:
-                self.signal_undelivered(msg.header.id_message(), address[0])
+                self.signal_undelivered(msg.header.id_message(), addr[0])
                 continue
 
             conn.send(msg.raw())
@@ -454,7 +454,7 @@ class network(QObject):
             message = Message(header, data_decrypted)
             self.send_received(message, address)  # подтверждаем принятие
             self.queue_rx.put((address, message))
-            logger.info(address[0] + " " + data_decrypted)
+            self.logger.info(address[0] + " " + data_decrypted)
             self.messages_log.append(('R', address[0], message))
 
         connection.close()
