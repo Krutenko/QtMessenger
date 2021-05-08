@@ -12,11 +12,13 @@ from Crypto.Util.Padding import unpad
 from Crypto.Util.number import getPrime
 from Crypto.Random import get_random_bytes
 import ifaddr
+import logging
 
 
 PRIME_LENGTH = 256
 MAX_LENGTH = PRIME_LENGTH * 2
 PORT_DEF = 55778  # application port
+logpath = "RX.log"
 
 
 # возвращаемый аргумент x является мультипликативно обратным к a, b - модуль
@@ -294,6 +296,9 @@ class network(QObject):
     connection_established = pyqtSignal(bool, str)  # true/false, ip
     exit_event = threading.Event()
 
+    logger = logging.getLogger('RX')
+
+
     def __init__(self):
         super(network, self).__init__()
 
@@ -308,6 +313,10 @@ class network(QObject):
         self.clients_connections = {}  # 'ip': connection
         self.clients_keys = {}  # 'ip': ((key, iv), (d, n)) # (d, n) - private key, maybe None if not needed
         self.listeners = []  # array of sockets
+
+        self.logger.setLevel(logging.INFO)
+        ch = logging.FileHandler(logpath)
+        logger.addHandler(ch)
 
         # Init sockets
         adapters = ifaddr.get_adapters()
@@ -445,6 +454,7 @@ class network(QObject):
             message = Message(header, data_decrypted)
             self.send_received(message, address)  # подтверждаем принятие
             self.queue_rx.put((address, message))
+            logger.info(address[0] + " " + data_decrypted)
             self.messages_log.append(('R', address[0], message))
 
         connection.close()
