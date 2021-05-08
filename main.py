@@ -36,6 +36,7 @@ class MainWindow(QMainWindow):
         variables.signals.message_sent.connect(self.messageSent)
         variables.nw.received.connect(self.receiveMessage)
         variables.nw.undelivered.connect(self.undelivered)
+        variables.nw.delivered.connect(self.delivered)
         variables.nw.read.connect(self.read)
         self.dialogs = []
         self.dialog_menu = DialogList()
@@ -49,6 +50,8 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event):
         super(MainWindow, self).resizeEvent(event)
         variables.window_width = self.size().width()
+        for i in range(len(self.dialogs)):
+            self.dialogs[i].width_changed.emit()
 
     def createDialog(self, ip):
         self.dialogs.append(Dialog(ip))
@@ -68,12 +71,11 @@ class MainWindow(QMainWindow):
         for i in range(len(self.dialogs)):
             if self.dialogs[i].ip == ip:
                 self.dialogs[i].message_from(msg)
+                self.dialog_menu.model.last_msg(i, msg, variables.USER_THEM)
                 if self.main_widget.currentIndex() == 1 and self.main_widget.currentWidget().ip == ip:
                     variables.nw.send_read(self.dialogs[i].model.rowCount(), ip)
                 else:
-                    print("Here")
                     self.dialog_menu.model.set_status(i, variables.STATUS_NEW)
-                self.dialog_menu.model.last_msg(i, msg, variables.USER_THEM)
 
     def messageSent(self, msg, ip):
         for i in range(len(self.dialogs)):
@@ -85,6 +87,12 @@ class MainWindow(QMainWindow):
             if self.dialogs[i].ip == ip:
                 self.dialogs[i].model.setStatus(id, variables.STATUS_UNDELIVERED)
                 self.dialog_menu.model.set_status(id, variables.STATUS_UNDELIVERED)
+
+    def delivered(self, id, ip):
+        for i in range(len(self.dialogs)):
+            if self.dialogs[i].ip == ip:
+                self.dialogs[i].model.setStatus(id, variables.STATUS_UNREAD)
+                self.dialog_menu.model.set_status(i, variables.STATUS_UNREAD)
 
     def read(self, id, ip):
         for i in range(len(self.dialogs)):

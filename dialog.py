@@ -9,6 +9,7 @@ from PyQt5.QtCore import (
     QPoint,
     QRectF,
     QEvent,
+    pyqtSignal,
 )
 from PyQt5.QtGui import (
     QColor,
@@ -66,9 +67,9 @@ class MessageDelegate(QStyledItemDelegate):
         field = field.marginsAdded(variables.TEXT_PADDING)
         line_height = QFontMetrics(variables.font).lineSpacing() + variables.TEXT_PADDING.bottom() - variables.BUBBLE_PADDING.bottom() + variables.TEXT_PADDING.top() - variables.BUBBLE_PADDING.top()
         if msg.user == variables.USER_ME:
-            rect = QRect(option.rect.right() - field.size().width() - 20, msg.Y, field.size().width(), field.size().height())
+            rect = QRect(option.rect.right() - field.size().width() - 20, option.rect.top(), field.size().width(), field.size().height())
         else:
-            rect = QRect(20, msg.Y, field.size().width(), field.size().height())
+            rect = QRect(20, option.rect.top(), field.size().width(), field.size().height())
         bubblerect = rect.marginsRemoved(variables.BUBBLE_PADDING)
         textrect = rect.marginsRemoved(variables.TEXT_PADDING)
         if msg.user == variables.USER_ME:
@@ -126,8 +127,9 @@ class MessageDelegate(QStyledItemDelegate):
 
 
 class MessageModel(QAbstractListModel):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, ip, *args, **kwargs):
         super(MessageModel, self).__init__(*args, **kwargs)
+        self.ip = ip
         self.messages = []
 
     def data(self, index, role):
@@ -147,7 +149,7 @@ class MessageModel(QAbstractListModel):
 
     def setStatus(self, id, status):
         self.messages[id].status = status
-        self.layoutChanged()
+        self.layoutChanged.emit()
 
     def add_message(self, text, user):
         if text:
@@ -160,7 +162,14 @@ class MessageModel(QAbstractListModel):
             return length
 
     def send_read(self):
-        pass
+        for i in reversed(range(len(self.messages))):
+            if self.messages[i].user == variables.USER_ME:
+                break
+            elif self.messages[i].status == variables.STATUS_READ:
+                break
+            else:
+                self.messages[i].status = variables.STATUS_READ
+                variables.nw.send_read(i, self.ip)
 
 
 class PicButton(QAbstractButton):
@@ -191,6 +200,7 @@ class PicButton(QAbstractButton):
 
 
 class Dialog(QWidget):
+    width_changed = pyqtSignal()
 
     def __init__(self, ip):
         super(Dialog, self).__init__()
@@ -209,8 +219,10 @@ class Dialog(QWidget):
         self.ip_label = QLabel(ip)
         self.ip_label.setFont(variables.font)
         self.messages = QListView()
-        self.messages.setItemDelegate(MessageDelegate())
-        self.model = MessageModel()
+        delegate = MessageDelegate()
+        self.messages.setItemDelegate(delegate)
+        self.width_changed.connect(lambda: delegate.sizeHintChanged.emit(QModelIndex()))
+        self.model = MessageModel(ip)
         self.messages.setModel(self.model)
         self.send_btn.released.connect(self.message_to)
         self.back_btn.released.connect(self.return_to_menu)
@@ -238,8 +250,6 @@ class Dialog(QWidget):
         self.send_input.setFocus()
 
     def message_from(self, msg):
-        print(msg)
-        print(self.ip)
         self.model.add_message(msg, variables.USER_THEM)
 
     def undelivered_status(self, id):
