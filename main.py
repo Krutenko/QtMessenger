@@ -73,7 +73,7 @@ class MainWindow(QMainWindow):
                 self.dialogs[i].message_from(msg)
                 self.dialog_menu.model.last_msg(i, msg, variables.USER_THEM)
                 if self.main_widget.currentIndex() == 1 and self.main_widget.currentWidget().ip == ip:
-                    variables.nw.send_read(self.dialogs[i].model.rowCount(), ip)
+                    self.dialogs[i].send_read()
                 else:
                     self.dialog_menu.model.set_status(i, variables.STATUS_NEW)
 
