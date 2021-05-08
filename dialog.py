@@ -139,13 +139,11 @@ class MessageModel(QAbstractListModel):
 
     def setStatus(self, id, status):
         self.messages[id].status = status
-        self.layoutChanged.emit()
 
     def add_message(self, text, user):
         if text:
             length = len(self.messages)
             self.messages.append(Message(text, user))
-            self.layoutChanged.emit()
             return length
 
     def send_read(self):
