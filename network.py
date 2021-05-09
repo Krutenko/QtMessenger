@@ -294,6 +294,7 @@ class network(QObject):
     read = pyqtSignal(int, str)  # emit when read
     client_connected = pyqtSignal(str)  # str - ip
     connection_established = pyqtSignal(bool, str)  # true/false, ip
+    reconnect = pyqtSignal(str)  # ip
     exit_event = threading.Event()
 
     logger = logging.getLogger('RX')
@@ -396,12 +397,14 @@ class network(QObject):
             self.clients_connections[address[0]] = s
             connection = self.clients_connections[address[0]]
 
+            self.init_session_key(address)  # TODO мб еще когда-то запрашивать новый сеансовый ключ
             if address[0] not in self.clients_states:
                 self.clients_states.append(address[0])
+                self.connection_established.emit(True, address[0])
+            else:
+                self.reconnect.emit(address[0])
 
-            self.init_session_key(address)  # TODO мб еще когда-то запрашивать новый сеансовый ключ
 
-            self.connection_established.emit(True, address[0])
         else:
             connection = connection_
 
@@ -551,3 +554,4 @@ class network(QObject):
         threading.Thread(target=self.worker_client_listener, args=((ip, PORT_DEF), None)).start()
 
         return True
+    
