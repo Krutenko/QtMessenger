@@ -82,6 +82,7 @@ class DialogDelegate(QStyledItemDelegate):
         string = ""
         if dlg.user == variables.USER_ME:
             string += "You: "
+        print(dlg.msg)
         string += dlg.msg
         fm = QFontMetrics(variables.font_small)
         textrect = QRect(option.rect)

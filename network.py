@@ -258,7 +258,7 @@ class Message:
 
     @classmethod
     def key_request(cls):
-        print('key_request')
+        # print('key_request')
         return cls(header=Header(length=Header.len_predef(), flag_key_l=True))
 
     # |e| = 2 bytes, |n| = 512 bytes
@@ -294,6 +294,7 @@ class network(QObject):
     read = pyqtSignal(int, str)  # emit when read
     client_connected = pyqtSignal(str)  # str - ip
     connection_established = pyqtSignal(bool, str)  # true/false, ip
+    reconnect = pyqtSignal(str)  # ip
     exit_event = threading.Event()
 
     logger = logging.getLogger('RX')
@@ -329,7 +330,7 @@ class network(QObject):
                         s.bind((ip_.ip, PORT_DEF))
                     except Exception as e:
                         continue
-                    print('Listening on ' + ip_.ip + ':' + str(PORT_DEF))
+                    #print('Listening on ' + ip_.ip + ':' + str(PORT_DEF))
                     self.listeners.append(s)
                     self.restricted_ip.append(ip_.ip)
                     threading.Thread(target=self.worker_main_listener, args=(s,)).start()
@@ -380,7 +381,7 @@ class network(QObject):
             connection, addr = socket_.accept()
             self.clients_connections[addr[0]] = connection
             threading.Thread(target=self.worker_client_listener, args=(addr, connection)).start()
-            print('Inbound connection: ' + addr[0])
+            # print('Inbound connection: ' + addr[0])
             self.signal_client_connected(addr[0])
 
     def worker_client_listener(self, address: (str, int), connection_ = None):
@@ -389,22 +390,23 @@ class network(QObject):
             try:
                 s.connect(address)
             except Exception as e:
-                print('Error: ' + str(e))
+                # print('Error: ' + str(e))
                 s.close()
                 self.connection_established.emit(False, address[0])
                 return
             self.clients_connections[address[0]] = s
             connection = self.clients_connections[address[0]]
 
+            self.init_session_key(address)  # TODO мб еще когда-то запрашивать новый сеансовый ключ
             if address[0] not in self.clients_states:
                 self.clients_states.append(address[0])
-
-            self.init_session_key(address)  # TODO мб еще когда-то запрашивать новый сеансовый ключ
-
-            self.connection_established.emit(True, address[0])
+                self.connection_established.emit(True, address[0])
+            else:
+                self.reconnect.emit(address[0])
         else:
             connection = connection_
-
+            if address[0] in self.clients_states:
+                self.reconnect.emit(address[0])
 
         while True:
             if self.exit_event.is_set():
@@ -417,10 +419,10 @@ class network(QObject):
             header = Header.from_raw(header_raw)
             flag_key_l, flag_key_h, flag_recvd, flag_read = header.parse_flags(header.flags())
 
-            print('recvd vvv')
-            print(header.length())
-            print(header.header_data)
-            print('^^^')
+            # print('recvd vvv')
+            # print(header.length())
+            # print(header.header_data)
+            # print('^^^')
 
             if flag_key_l and not flag_key_h:
                 self.got_rsa_req(address)
@@ -448,8 +450,8 @@ class network(QObject):
             key, iv = (self.clients_keys[address[0]])[0]
             data_decrypted = AES_decrypt(data, key, iv)
 
-            print(data)
-            print(data_decrypted)
+            # print(data)
+            # print(data_decrypted)
 
             message = Message(header, data_decrypted)
             self.send_received(message, address)  # подтверждаем принятие
@@ -485,10 +487,10 @@ class network(QObject):
         self.clients_keys[address[0]] = ((key, iv), None)
 
     def send_any_message(self, message: Message, address: (str, int)):
-        print('sent vvv')
-        print(message.header.header_data)
-        print(message.header.length())
-        print('^^^')
+        # print('sent vvv')
+        # print(message.header.header_data)
+        # print(message.header.length())
+        # print('^^^')
         self.queue_tx.put((address, message))
 
     def init_session_key(self, address: (str, int)):
@@ -551,3 +553,4 @@ class network(QObject):
         threading.Thread(target=self.worker_client_listener, args=((ip, PORT_DEF), None)).start()
 
         return True
+
