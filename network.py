@@ -403,11 +403,10 @@ class network(QObject):
                 self.connection_established.emit(True, address[0])
             else:
                 self.reconnect.emit(address[0])
-
-
         else:
             connection = connection_
-
+            if address[0] in self.clients_states:
+                self.reconnect.emit(address[0])
 
         while True:
             if self.exit_event.is_set():
