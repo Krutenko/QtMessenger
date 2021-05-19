@@ -9,6 +9,7 @@ from PyQt5.QtCore import (
     QPoint,
     QRectF,
     QEvent,
+    QModelIndex,
     pyqtSignal,
 )
 from PyQt5.QtGui import (
@@ -129,6 +130,7 @@ class MessageModel(QAbstractListModel):
         super(MessageModel, self).__init__(*args, **kwargs)
         self.ip = ip
         self.messages = []
+        self.base = 0
 
     def data(self, index, role):
         if role == Qt.DisplayRole:
@@ -138,7 +140,7 @@ class MessageModel(QAbstractListModel):
         return len(self.messages)
 
     def setStatus(self, id, status):
-        self.messages[id].status = status
+        self.messages[self.base + id].status = status
         self.layoutChanged.emit()
 
     def add_message(self, text, user):
@@ -146,7 +148,7 @@ class MessageModel(QAbstractListModel):
             length = len(self.messages)
             self.messages.append(Message(text, user))
             self.layoutChanged.emit()
-            return length
+            return length - self.base
 
     def send_read(self):
         for i in reversed(range(len(self.messages))):
@@ -156,7 +158,10 @@ class MessageModel(QAbstractListModel):
                 break
             else:
                 self.messages[i].status = variables.STATUS_READ
-                variables.nw.send_read(i, self.ip)
+                variables.nw.send_read(i - self.base, self.ip)
+
+    def new_base(self):
+        self.base = self.base + len(self.messages)
 
 
 class PicButton(QAbstractButton):

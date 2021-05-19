@@ -553,4 +553,3 @@ class network(QObject):
         threading.Thread(target=self.worker_client_listener, args=((ip, PORT_DEF), None)).start()
 
         return True
-    

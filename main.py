@@ -38,6 +38,7 @@ class MainWindow(QMainWindow):
         variables.nw.undelivered.connect(self.undelivered)
         variables.nw.delivered.connect(self.delivered)
         variables.nw.read.connect(self.read)
+        variables.nw.reconnect.connect(self.clientReconnected)
         self.dialogs = []
         self.dialog_menu = DialogList()
         self.main_widget = QStackedWidget()
@@ -73,7 +74,7 @@ class MainWindow(QMainWindow):
                 self.dialogs[i].message_from(msg)
                 self.dialog_menu.model.last_msg(i, msg, variables.USER_THEM)
                 if self.main_widget.currentIndex() == 1 and self.main_widget.currentWidget().ip == ip:
-                    variables.nw.send_read(self.dialogs[i].model.rowCount(), ip)
+                    self.dialogs[i].model.send_read()
                 else:
                     self.dialog_menu.model.set_status(i, variables.STATUS_NEW)
 
@@ -86,7 +87,7 @@ class MainWindow(QMainWindow):
         for i in range(len(self.dialogs)):
             if self.dialogs[i].ip == ip:
                 self.dialogs[i].model.setStatus(id, variables.STATUS_UNDELIVERED)
-                self.dialog_menu.model.set_status(id, variables.STATUS_UNDELIVERED)
+                self.dialog_menu.model.set_status(i, variables.STATUS_UNDELIVERED)
 
     def delivered(self, id, ip):
         for i in range(len(self.dialogs)):
@@ -98,7 +99,12 @@ class MainWindow(QMainWindow):
         for i in range(len(self.dialogs)):
             if self.dialogs[i].ip == ip:
                 self.dialogs[i].model.setStatus(id, variables.STATUS_READ)
-                self.dialog_menu.model.set_status(id, variables.STATUS_READ)
+                self.dialog_menu.model.set_status(i, variables.STATUS_READ)
+
+    def clientReconnected(self, ip):
+        for i in range(len(self.dialogs)):
+            if self.dialogs[i].ip == ip:
+                self.dialogs[i].model.new_base()
 
 
 app = QApplication(sys.argv)
