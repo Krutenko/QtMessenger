@@ -234,6 +234,8 @@ class Dialog(QWidget):
 
     def message_to(self):
         msg = self.send_input.toPlainText()
+        if not msg:
+            return
         id = self.model.add_message(msg, variables.USER_ME)
         variables.nw.send_message(id, msg, self.ip)
         variables.signals.message_sent.emit(msg, self.ip)
