@@ -151,7 +151,7 @@ class MessageModel(QAbstractListModel):
             return length - self.base
 
     def send_read(self):
-        for i in reversed(range(len(self.messages))):
+        for i in reversed(range(self.base, len(self.messages))):
             if self.messages[i].user == variables.USER_ME:
                 break
             elif self.messages[i].status == variables.STATUS_READ:
